@@ -4,7 +4,7 @@ I've been writing [Phoenix
 LiveView](https://github.com/phoenixframework/phoenix_live_view) lately, but I
 found it hard to organize my JavaScript hooks. Enter Capt Hook.
 
-```
+```ts
 import { Hook } from "capt-hook";
 
 /**
