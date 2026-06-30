@@ -2,14 +2,31 @@
   "name": "capt-hook",
   "version": "0.1.0",
   "description": "Base class for Phoenix LiveView hooks",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
+    "test": "vitest"
   },
   "peerDependencies": {
     "phoenix_live_view": "*"
   },
-  "license": "MIT",
-  "private": true
+  "devDependencies": {
+    "happy-dom": "*",
+    "phoenix_live_view": "*",
+    "typescript": "^5",
+    "vitest": "^3"
+  },
+  "license": "MIT"
 }
