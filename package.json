@@ -1,5 +1,5 @@
 {
-  "name": "capt-hook",
+  "name": "@nmsmith/capt-hook",
   "version": "0.1.0",
   "description": "Base class for Phoenix LiveView hooks",
   "type": "module",
