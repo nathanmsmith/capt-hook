@@ -59,7 +59,7 @@ class Hook extends ViewHook {
   }
 
   /** Handles an event pushed from the server to this hook. */
-  handleFromServer<T extends object>(event: string, callback: (payload: T) => void) {
+  handleFromServer<T extends object>(event: string, callback: (payload: T) => void): ReturnType<ViewHook['handleEvent']> {
     return this.handleEvent(event, callback);
   }
 
