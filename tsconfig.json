@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "paths": {
+      "phoenix_live_view": ["../../deps/phoenix_live_view"],
+      "phoenix_live_view/*": ["../../deps/phoenix_live_view/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}

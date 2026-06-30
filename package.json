@@ -1,0 +1,15 @@
+{
+  "name": "capt-hook",
+  "version": "0.1.0",
+  "description": "Base class for Phoenix LiveView hooks",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "phoenix_live_view": "*"
+  },
+  "license": "MIT",
+  "private": true
+}
