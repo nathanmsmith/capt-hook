@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { Hook } from "./Hook";
-import { makeHook } from "./__tests__/helpers";
+import { Hook } from "./Hook.js";
+import { makeHook } from "./__tests__/helpers.js";
 
 describe("Hook", () => {
   describe("#resolveTarget", () => {
