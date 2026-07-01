@@ -1,6 +1,6 @@
 {
   "name": "@nmsmith/capt-hook",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Base class for Phoenix LiveView hooks",
   "type": "module",
   "main": "./dist/index.js",
