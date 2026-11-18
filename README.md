@@ -1,5 +1,8 @@
 # Capt Hook
 
+[![CI](https://github.com/nathanmsmith/capt-hook/actions/workflows/ci.yml/badge.svg)](https://github.com/nathanmsmith/capt-hook/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/nathanmsmith/capt-hook/graph/badge.svg)](https://codecov.io/gh/nathanmsmith/capt-hook)
+
 I've been writing [Phoenix
 LiveView](https://github.com/phoenixframework/phoenix_live_view) lately, but I
 found it hard to organize my JavaScript hooks. Enter Capt Hook.
