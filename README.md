@@ -11,8 +11,7 @@ Hooks](https://phoenix-live-view.hexdocs.pm/js-interop.html). Capt Hook is a
 more organizable (imo) way to write hooks.
 
 
-You might have
-something like this in your Heex:
+You might have something like this in your Heex:
 
 ```html
 <input type="text" name="user[phone_number]" id="user-phone-number" phx-hook="PhoneNumber" />
@@ -20,66 +19,37 @@ something like this in your Heex:
 
 With Capt Hook, the hook is written as:
 ```ts
-// TODO: rewrite in hook style
-let Hooks = {}
-Hooks.PhoneNumber = {
+import { Hook } from "@nmsmith/capt-hook";
+
+class PhoneNumber extends Hook {
   mounted() {
-    this.el.addEventListener("input", e => {
-      let match = this.el.value.replace(/\D/g, "").match(/^(\d{3})(\d{3})(\d{4})$/)
-      if(match) {
-        this.el.value = `${match[1]}-${match[2]}-${match[3]}`
-      }
-    })
+    super.mounted();
+    this.el.addEventListener("input", () => this.#format());
+  }
+
+  #format() {
+    const input = this.el as HTMLInputElement;
+    const match = input.value.replace(/\D/g, "").match(/^(\d{3})(\d{3})(\d{4})$/);
+    if (match) {
+      input.value = `${match[1]}-${match[2]}-${match[3]}`;
+    }
   }
 }
 
-let liveSocket = new LiveSocket("/live", Socket, {hooks: Hooks, ...})
+// main.js
+let liveSocket = new LiveSocket("/live", Socket, { hooks: { PhoneNumber }, ... });
 ...
 ```
 
+## Event helpers
 
-```ts
-import { Hook } from "capt-hook";
+Capt Hook takes advantage of class definition syntax of phx-hooks to provide a
+few reusable helpers:
 
-/**
- * Copies the element's href to the clipboard and temporarily swaps the inner
- * span's text to "link copied" for 2 seconds.
- */
-class InvitationLink extends Hook {
-  #timer: ReturnType<typeof setTimeout> | null = null;
-  #originalText: string | null = null;
+* `pushToServer` - Pushes a LiveView event scoped to the nearest component (or LiveView).
+* `handleFromServer` - Pushes a LiveView event scoped to the nearest component (or LiveView).
+* `pushToClient` - Dispatches a `CustomEvent` on `window` for other client-side listeners.
+* `handleFromClient` - Listens for a `CustomEvent` on `window`.
 
-  mounted() {
-    super.mounted();
-    this.#originalText = this.el.textContent;
-    this.el.addEventListener("click", (e) => this.#handleClick(e));
-  }
-
-  destroyed() {
-    if (this.#timer !== null) {
-      clearTimeout(this.#timer);
-    }
-    super.destroyed();
-  }
-
-  #handleClick(e: Event) {
-    e.preventDefault();
-    navigator.clipboard.writeText((this.el as HTMLAnchorElement).href).catch(() => {});
-
-    this.el.textContent = "link copied";
-
-    if (this.#timer !== null) {
-      clearTimeout(this.#timer);
-    }
-    this.#timer = setTimeout(() => {
-      this.el.textContent = this.#originalText;
-      this.#timer = null;
-    }, 2000);
-  }
-}
-
-export { InvitationLink };
-```
-
-## Further Reading
-https://phoenix-live-view.hexdocs.pm/js-interop.html#client-hooks-via-phx-hook
+This is mainly a wrapper around `pushEventTo` and `handleEvent`. The entire hook
+definition is [<100 lines of code](src/Hook.ts).
