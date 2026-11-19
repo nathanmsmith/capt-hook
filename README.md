@@ -4,7 +4,7 @@
 [![codecov](https://codecov.io/gh/nathanmsmith/capt-hook/graph/badge.svg)](https://codecov.io/gh/nathanmsmith/capt-hook)
 
 
-![./capt-hook.png]
+![Capt Hook](docs/capt-hook.png)
 
 You're probably familiar with [Phoenix Liveview
 Hooks](https://phoenix-live-view.hexdocs.pm/js-interop.html). Capt Hook is a
@@ -25,6 +25,13 @@ class PhoneNumber extends Hook {
   mounted() {
     super.mounted();
     this.el.addEventListener("input", () => this.#format());
+    this.el.addEventListener("blur", () => {
+      this.pushToServer("validate_phone", { value: (this.el as HTMLInputElement).value });
+    });
+
+    this.handleFromServer<{ valid: boolean }>("phone_validated", ({ valid }) => {
+      this.el.classList.toggle("invalid", !valid);
+    });
   }
 
   #format() {
@@ -41,13 +48,23 @@ let liveSocket = new LiveSocket("/live", Socket, { hooks: { PhoneNumber }, ... }
 ...
 ```
 
+On the server, `validate_phone` goes to the nearest LiveComponent (or the
+LiveView), and `phone_validated` is sent back with `push_event`:
+
+```elixir
+def handle_event("validate_phone", %{"value" => value}, socket) do
+  valid = Regex.match?(~r/^\d{3}-\d{3}-\d{4}$/, value)
+  {:noreply, push_event(socket, "phone_validated", %{valid: valid})}
+end
+```
+
 ## Event helpers
 
 Capt Hook takes advantage of class definition syntax of phx-hooks to provide a
 few reusable helpers:
 
 * `pushToServer` - Pushes a LiveView event scoped to the nearest component (or LiveView).
-* `handleFromServer` - Pushes a LiveView event scoped to the nearest component (or LiveView).
+* `handleFromServer` - Handles an event pushed from the server to this hook.
 * `pushToClient` - Dispatches a `CustomEvent` on `window` for other client-side listeners.
 * `handleFromClient` - Listens for a `CustomEvent` on `window`.
 
