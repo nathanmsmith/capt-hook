@@ -78,3 +78,89 @@ few reusable helpers:
 
 This is mainly a wrapper around `pushEventTo` and `handleEvent`. The entire hook
 definition is [<100 lines of code](src/Hook.ts).
+
+Each helper takes a type parameter for its payload:
+
+```ts
+this.pushToServer<{ value: string }>("validate_phone", { value: "555-555-5555" });
+this.handleFromServer<{ valid: boolean }>("phone_validated", ({ valid }) => { ... });
+this.pushToClient<{ id: string }>("item:selected", { id: "42" });
+this.handleFromClient<{ id: string }>("item:selected", ({ id }) => { ... });
+```
+
+### Replies
+
+`pushToServer` takes an optional callback that receives the server's reply and
+the push's ref:
+
+```ts
+this.pushToServer("save", { value }, (reply, ref) => {
+  console.log(reply.status);
+});
+```
+
+```elixir
+def handle_event("save", %{"value" => value}, socket) do
+  {:reply, %{status: "ok"}, socket}
+end
+```
+
+### Where `pushToServer` sends events
+
+The target is resolved once, when the hook mounts:
+
+1. The element's `data-target` attribute, if set. It's passed to `pushEventTo`,
+   so it should be a CSS selector for the target component's element.
+2. Otherwise, the nearest LiveComponent containing the element.
+3. Otherwise, the LiveView.
+
+```html
+<div phx-hook="Chart" id="chart" data-target="#sidebar-component">
+```
+
+### Client event cleanup
+
+Listeners added with `handleFromClient` are removed from `window` automatically
+when the hook is destroyed, so you don't need to track them yourself.
+
+## Lifecycle
+
+If you override `mounted()` or `destroyed()`, call `super`:
+
+```ts
+class Chart extends Hook {
+  mounted() {
+    super.mounted(); // resolves the pushToServer target
+    // ...
+  }
+
+  destroyed() {
+    // ...
+    super.destroyed(); // removes handleFromClient listeners
+  }
+}
+```
+
+Skipping `super.mounted()` means `pushToServer` has no target, and skipping
+`super.destroyed()` leaves `handleFromClient` listeners attached to `window`.
+
+`Hook` also defines a few extra lifecycle methods:
+
+* `afterUpdate()` - Called from `updated()`. Override it instead of `updated()`;
+  if you override `updated()` directly, call `super.updated()` or `afterUpdate()`
+  won't run.
+* `onDisconnect()` / `onReconnect()` - Call `disconnected()` / `reconnected()`.
+
+## Development
+
+```sh
+npm install
+npm test             # run tests in watch mode
+npm run coverage     # run tests once with coverage
+npm run lint
+npm run build        # compile to dist/
+```
+
+## License
+
+[MIT](LICENSE)
