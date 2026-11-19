@@ -10,6 +10,14 @@ You're probably familiar with [Phoenix Liveview
 Hooks](https://phoenix-live-view.hexdocs.pm/js-interop.html). Capt Hook is a
 more organizable (imo) way to write hooks.
 
+## Installation
+
+Requires Phoenix LiveView 1.1.2 or later. From your Phoenix project's root:
+
+```sh
+npm install @nmsmith/capt-hook --prefix assets
+```
+
 
 You might have something like this in your Heex:
 
