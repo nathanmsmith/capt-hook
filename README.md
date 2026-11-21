@@ -18,53 +18,113 @@ Requires Phoenix LiveView 1.1.2 or later. From your Phoenix project's root:
 npm install @nmsmith/capt-hook --prefix assets
 ```
 
+## Example
 
-You might have something like this in your Heex:
+I find Capt Hook works best when you think of your hooks and elements as
+"components" as opposed to reusable chunks of frontend logic.
 
-```html
-<input type="text" name="user[phone_number]" id="user-phone-number" phx-hook="PhoneNumber" />
+For example, let's suppose we have an autosaving note editor that lives inside a
+LiveComponent, plus a status button somewhere else on the page (say, the header)
+that shows when the note was last saved and can trigger a save on demand.
+
+```heex
+<%!-- In the layout header --%>
+<button id="save-status-button" phx-hook="SaveStatusButton">Save</button>
+
+<%!-- Inside the NoteEditor LiveComponent --%>
+<textarea id={"note-#{@note.id}"} phx-hook="NoteTextarea" phx-update="ignore">{@note.body}</textarea>
 ```
 
-With Capt Hook, the hook is written as:
 ```ts
 import { Hook } from "@nmsmith/capt-hook";
 
-class PhoneNumber extends Hook {
-  mounted() {
-    super.mounted();
-    this.el.addEventListener("input", () => this.#format());
-    this.el.addEventListener("blur", () => {
-      this.pushToServer("validate_phone", { value: (this.el as HTMLInputElement).value });
-    });
+// hooks/NoteTextarea.ts
+type Saved = { saved_at: string };
 
-    this.handleFromServer<{ valid: boolean }>("phone_validated", ({ valid }) => {
-      this.el.classList.toggle("invalid", !valid);
-    });
+class NoteTextarea extends Hook {
+  #timer?: number;
+
+  get #textarea() {
+    return this.el as HTMLTextAreaElement;
   }
 
-  #format() {
-    const input = this.el as HTMLInputElement;
-    const match = input.value.replace(/\D/g, "").match(/^(\d{3})(\d{3})(\d{4})$/);
-    if (match) {
-      input.value = `${match[1]}-${match[2]}-${match[3]}`;
-    }
+  mounted() {
+    super.mounted();
+
+    this.el.addEventListener("input", () => {
+      clearTimeout(this.#timer);
+      this.#timer = window.setTimeout(() => this.#save(), 500);
+    });
+
+    // The server replaces the draft, e.g. when someone else edits the note
+    this.handleFromServer<{ body: string }>("note:replaced", ({ body }) => {
+      this.#textarea.value = body;
+    });
+
+    // Other hooks on the page can ask for an immediate save
+    this.handleFromClient("note:save-now", () => this.#save());
+  }
+
+  destroyed() {
+    clearTimeout(this.#timer);
+    super.destroyed();
+  }
+
+  #save() {
+    clearTimeout(this.#timer);
+    this.pushToServer("autosave", { body: this.#textarea.value }, (reply: Saved) => {
+      this.pushToClient<Saved>("note:saved", reply);
+    });
   }
 }
 
-// main.js
-let liveSocket = new LiveSocket("/live", Socket, { hooks: { PhoneNumber }, ... });
-...
+// hooks/SaveStatusButton.ts
+class SaveStatusButton extends Hook {
+  mounted() {
+    super.mounted();
+    this.el.addEventListener("click", () => this.pushToClient("note:save-now"));
+
+    this.handleFromClient<Saved>("note:saved", ({ saved_at }) => {
+      this.el.textContent = `Saved ${new Date(saved_at).toLocaleTimeString()}`;
+    });
+  }
+}
+
+// app.js
+let liveSocket = new LiveSocket("/live", Socket, { hooks: { NoteTextarea, SaveStatusButton }, ... });
 ```
 
-On the server, `validate_phone` goes to the nearest LiveComponent (or the
-LiveView), and `phone_validated` is sent back with `push_event`:
+
+Every Hook is defined as a subclass of `Hook`. Each hook/class can declare
+private state and methods with `#`. (See [MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/Private_elements) for details.)
+
+On the server, `autosave` is handled by the `NoteEditor` component, with no
+`phx-target` needed:
 
 ```elixir
-def handle_event("validate_phone", %{"value" => value}, socket) do
-  valid = Regex.match?(~r/^\d{3}-\d{3}-\d{4}$/, value)
-  {:noreply, push_event(socket, "phone_validated", %{valid: valid})}
+def handle_event("autosave", %{"body" => body}, socket) do
+  note = Notes.update_note!(socket.assigns.note, %{body: body})
+  {:reply, %{saved_at: DateTime.utc_now()}, assign(socket, note: note)}
 end
 ```
+
+and `note:replaced` is sent with `push_event`:
+
+```elixir
+push_event(socket, "note:replaced", %{body: note.body})
+```
+
+What Capt Hook takes care of here:
+
+* **Routing.** `autosave` goes to the `NoteEditor` component because the
+  textarea is inside it. No `phx-target`, no `pushEventTo` selector.
+* **Hook-to-hook messaging.** `NoteTextarea` and `SaveStatusButton` live in
+  different parts of the page and don't know about each other. They talk
+  through `pushToClient` / `handleFromClient`.
+* **Cleanup.** When the user navigates to another note and the editor is
+  removed, its `note:save-now` listener is removed from `window` too.
+* **Types.** Payloads are typed on both ends, so `saved_at` is checked in
+  `SaveStatusButton` and `body` in `note:replaced`.
 
 ## Event helpers
 
@@ -82,10 +142,10 @@ definition is [<100 lines of code](src/Hook.ts).
 Each helper takes a type parameter for its payload:
 
 ```ts
-this.pushToServer<{ value: string }>("validate_phone", { value: "555-555-5555" });
-this.handleFromServer<{ valid: boolean }>("phone_validated", ({ valid }) => { ... });
-this.pushToClient<{ id: string }>("item:selected", { id: "42" });
-this.handleFromClient<{ id: string }>("item:selected", ({ id }) => { ... });
+this.pushToServer<{ body: string }>("autosave", { body: "Hello" });
+this.handleFromServer<{ body: string }>("note:replaced", ({ body }) => { ... });
+this.pushToClient<{ saved_at: string }>("note:saved", { saved_at: "2026-11-21T12:00:00Z" });
+this.handleFromClient<{ saved_at: string }>("note:saved", ({ saved_at }) => { ... });
 ```
 
 ### Replies
