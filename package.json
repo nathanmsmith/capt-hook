@@ -26,7 +26,7 @@
     "coverage": "vitest run --coverage"
   },
   "peerDependencies": {
-    "phoenix_live_view": ">=1.1.2",
+    "phoenix_live_view": ">=1.1.9",
     "eslint": ">=9"
   },
   "peerDependenciesMeta": {

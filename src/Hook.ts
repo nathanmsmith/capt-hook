@@ -8,8 +8,11 @@ type OnReply = (reply: any, ref: number) => any;
  * Extends `ViewHook` with ergonomic wrappers for pushing/handling events
  * between the server and client, automatic cleanup of `window` listeners on
  * destroy, and a resolved push target scoped to the nearest LiveComponent.
+ *
+ * The type parameter narrows `this.el`, e.g. `class Editor extends
+ * Hook<HTMLTextAreaElement>`.
  */
-class Hook extends ViewHook {
+class Hook<E extends HTMLElement = HTMLElement> extends ViewHook<E> {
   #target: HTMLElement | string | undefined;
 
   // mounted() — Called once, when the element is first added to the DOM and the hook is attached. This is where you set up event listeners, initialize third-party libraries, read initial state from the element, etc. The element (this.el) is in the DOM at this point.
@@ -51,7 +54,11 @@ class Hook extends ViewHook {
   /**
    * Pushes a LiveView event scoped to the nearest component (or LiveView).
    */
-  pushToServer<T extends object>(event: string, payload: T, callback?: OnReply) {
+  pushToServer<T extends object>(
+    event: string,
+    payload: T,
+    callback?: OnReply,
+  ) {
     if (callback) {
       return this.pushEventTo(this.#target!, event, payload, callback);
     }
@@ -59,7 +66,10 @@ class Hook extends ViewHook {
   }
 
   /** Handles an event pushed from the server to this hook. */
-  handleFromServer<T extends object>(event: string, callback: (payload: T) => void): ReturnType<ViewHook['handleEvent']> {
+  handleFromServer<T extends object>(
+    event: string,
+    callback: (payload: T) => void,
+  ): ReturnType<ViewHook["handleEvent"]> {
     return this.handleEvent(event, callback);
   }
 
@@ -72,7 +82,10 @@ class Hook extends ViewHook {
    * Listens for a `CustomEvent` on `window`. The listener is automatically
    * removed when the hook is destroyed.
    */
-  handleFromClient<T extends object>(event: string, callback: (detail: T) => void) {
+  handleFromClient<T extends object>(
+    event: string,
+    callback: (detail: T) => void,
+  ) {
     const listener = (e: Event) => callback((e as CustomEvent).detail);
     this.#listeners.push([event, listener]);
     window.addEventListener(event, listener);
@@ -81,16 +94,12 @@ class Hook extends ViewHook {
   /**
    * Resolves the push target for this hook's element.
    *
-   * Returns `data-target` if explicitly set, otherwise walks up the DOM to
-   * find the nearest LiveComponent root (`[data-phx-component]`). Falls back
-   * to `undefined` if neither is present, which causes `pushEventTo` to
-   * target the LiveView itself.
+   * Returns `data-target` if explicitly set, otherwise the hook's own element.
+   * `pushEventTo` routes an element target to the nearest LiveComponent
+   * containing it, or to the LiveView if there is none.
    */
   #resolveTarget(): HTMLElement | string {
-    if (this.el.dataset.target) {
-      return this.el.dataset.target;
-    }
-    return this.el.closest<HTMLElement>("[data-phx-component]") ?? this.el;
+    return this.el.dataset.target || this.el;
   }
 }
 

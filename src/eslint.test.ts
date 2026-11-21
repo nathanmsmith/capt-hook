@@ -46,6 +46,10 @@ ruleTester.run("require-super-lifecycle", rule, {
       errors: [{ messageId: "missingSuper" }],
     },
     {
+      code: IMPORT + "class A extends Hook<HTMLTextAreaElement> { mounted() {} }",
+      errors: [{ messageId: "missingSuper" }],
+    },
+    {
       code: IMPORT + "const A = class extends Hook { mounted() {} };",
       errors: [{ messageId: "missingSuper" }],
     },

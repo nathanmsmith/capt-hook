@@ -12,7 +12,7 @@ more organizable (imo) way to write hooks.
 
 ## Installation
 
-Requires Phoenix LiveView 1.1.2 or later. From your Phoenix project's root:
+Requires Phoenix LiveView 1.1.9 or later. From your Phoenix project's root:
 
 ```sh
 npm install @nmsmith/capt-hook --prefix assets
@@ -41,11 +41,14 @@ import { Hook } from "@nmsmith/capt-hook";
 // hooks/NoteTextarea.ts
 type Saved = { saved_at: string };
 
-class NoteTextarea extends Hook {
+class NoteTextarea extends Hook<HTMLTextAreaElement> {
   #timer?: number;
 
-  get #textarea() {
-    return this.el as HTMLTextAreaElement;
+  #save() {
+    clearTimeout(this.#timer);
+    this.pushToServer("autosave", { body: this.el.value }, (reply: Saved) => {
+      this.pushToClient<Saved>("note:saved", reply);
+    });
   }
 
   mounted() {
@@ -58,7 +61,7 @@ class NoteTextarea extends Hook {
 
     // The server replaces the draft, e.g. when someone else edits the note
     this.handleFromServer<{ body: string }>("note:replaced", ({ body }) => {
-      this.#textarea.value = body;
+      this.el.value = body;
     });
 
     // Other hooks on the page can ask for an immediate save
@@ -68,13 +71,6 @@ class NoteTextarea extends Hook {
   destroyed() {
     clearTimeout(this.#timer);
     super.destroyed();
-  }
-
-  #save() {
-    clearTimeout(this.#timer);
-    this.pushToServer("autosave", { body: this.#textarea.value }, (reply: Saved) => {
-      this.pushToClient<Saved>("note:saved", reply);
-    });
   }
 }
 
@@ -94,24 +90,64 @@ class SaveStatusButton extends Hook {
 let liveSocket = new LiveSocket("/live", Socket, { hooks: { NoteTextarea, SaveStatusButton }, ... });
 ```
 
+Every Hook is defined as a subclass of `Hook`. If you're using TypeScript,
+`Hook` takes an optional subclass of `HTMLElement`, this is the type of `this.el`.
 
-Every Hook is defined as a subclass of `Hook`. Each hook/class can declare
-private state and methods with `#`. (See [MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/Private_elements) for details.)
+### Lifecycle Methods
 
-On the server, `autosave` is handled by the `NoteEditor` component, with no
-`phx-target` needed:
+Every hook has the same [lifecycle methods](https://phoenix-live-view.hexdocs.pm/js-interop.html#client-hooks-via-phx-hook)
+as LiveView:
+
+* `mounted` - the element has been added to the DOM and its server LiveView has finished mounting
+* `destroyed` - the element has been removed from the page, either by a parent update, or by the parent being removed entirely
+* `beforeUpdate(toEl)` - the element is about to be updated in the DOM. toEl is a detached element carrying the update that is about to be applied, while this.el is still the unmodified element as it currently exists in the DOM. This is the per-element counterpart to the dom option's onBeforeElUpdated callback described below. Note: any call here must be synchronous as the operation cannot be deferred or cancelled.
+* `afterUpdate` (or `updated`) - the element has been updated in the DOM by the server. Note: window.location may not reflect the current URL during this callback. For navigation-aware logic, use the phx:navigate event instead.
+* `disconnected` - the element's parent LiveView has disconnected from the server
+* `reconnected` - the element's parent LiveView has reconnected to the server
+
+### Private elements
+
+In addition, each hook/class can declare private state and methods with `#`.
+(See
+[MDN](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/Private_elements)
+for details.) I find that this allows for better code organization than just
+stuffing everything in the lifecycle methods. It reminds me a bit of React
+[class components](https://react.dev/reference/react/Component).
+
+### Working with server events
+
+On the server, `autosave` is handled directly by the `NoteEditor` component, with no
+`phx-target` needed!
 
 ```elixir
-def handle_event("autosave", %{"body" => body}, socket) do
-  note = Notes.update_note!(socket.assigns.note, %{body: body})
-  {:reply, %{saved_at: DateTime.utc_now()}, assign(socket, note: note)}
+defmodule MyAppWeb.NoteEditor do
+  use MyAppWeb, :live_component
+
+  alias MyApp.Notes
+
+  def render(assigns) do
+    ~H"""
+    <textarea id={"note-#{@note.id}"} phx-hook="NoteTextarea" phx-update="ignore">{@note.body}</textarea>
+    """
+  end
+
+  # The parent LiveView passes in a new note, e.g. after someone else edits it
+  def update(%{note: note} = assigns, socket) do
+    socket =
+      if socket.assigns[:note] && socket.assigns.note.body != note.body do
+        push_event(socket, "note:replaced", %{body: note.body})
+      else
+        socket
+      end
+
+    {:ok, assign(socket, assigns)}
+  end
+
+  def handle_event("autosave", %{"body" => body}, socket) do
+    note = Notes.update_note!(socket.assigns.note, %{body: body})
+    {:reply, %{saved_at: DateTime.utc_now()}, assign(socket, note: note)}
+  end
 end
-```
-
-and `note:replaced` is sent with `push_event`:
-
-```elixir
-push_event(socket, "note:replaced", %{body: note.body})
 ```
 
 What Capt Hook takes care of here:
@@ -225,6 +261,38 @@ extend `Hook` imported from `@nmsmith/capt-hook`.
   if you override `updated()` directly, call `super.updated()` or `afterUpdate()`
   won't run.
 * `onDisconnect()` / `onReconnect()` - Call `disconnected()` / `reconnected()`.
+
+### What to clean up in `destroyed()`
+
+LiveView only calls `destroyed()` when the hook's element is removed from the
+page (or the whole LiveView goes away). Listeners on `this.el` go with it, so
+you don't need to remove them. You do need to clean up anything that outlives
+the element:
+
+* Listeners on `window`, `document`, or other elements that stay on the page.
+  (`handleFromClient` listeners are removed for you.)
+* Timers and intervals (`clearTimeout`, `clearInterval`).
+* Third-party library instances (call their `destroy()`/`dispose()`).
+* Observers (`ResizeObserver`, `IntersectionObserver`, `MutationObserver`).
+
+```ts
+class Chart extends Hook {
+  #chart?: ChartLib;
+  #onResize = () => this.#chart?.resize();
+
+  mounted() {
+    super.mounted();
+    this.#chart = new ChartLib(this.el);
+    window.addEventListener("resize", this.#onResize);
+  }
+
+  destroyed() {
+    window.removeEventListener("resize", this.#onResize);
+    this.#chart?.destroy();
+    super.destroyed();
+  }
+}
+```
 
 ## Development
 
