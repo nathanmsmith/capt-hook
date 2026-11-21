@@ -9,6 +9,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./eslint": {
+      "import": "./dist/eslint.js",
+      "types": "./dist/eslint.d.ts"
     }
   },
   "files": [
@@ -22,7 +26,13 @@
     "coverage": "vitest run --coverage"
   },
   "peerDependencies": {
-    "phoenix_live_view": ">=1.1.2"
+    "phoenix_live_view": ">=1.1.2",
+    "eslint": ">=9"
+  },
+  "peerDependenciesMeta": {
+    "eslint": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@typescript-eslint/parser": "^8.62.1",

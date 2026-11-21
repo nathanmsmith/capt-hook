@@ -204,6 +204,21 @@ class Chart extends Hook {
 Skipping `super.mounted()` means `pushToServer` has no target, and skipping
 `super.destroyed()` leaves `handleFromClient` listeners attached to `window`.
 
+To catch this at lint time, add the bundled ESLint rule (ESLint 9+, flat
+config) to `eslint.config.js`:
+
+```js
+import captHook from "@nmsmith/capt-hook/eslint";
+
+export default [
+  // ...
+  captHook.configs.recommended,
+];
+```
+
+The rule (`capt-hook/require-super-lifecycle`) checks classes that directly
+extend `Hook` imported from `@nmsmith/capt-hook`.
+
 `Hook` also defines a few extra lifecycle methods:
 
 * `afterUpdate()` - Called from `updated()`. Override it instead of `updated()`;
