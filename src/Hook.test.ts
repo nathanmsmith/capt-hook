@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, expectTypeOf, vi } from "vitest";
 import { Hook } from "./Hook.js";
 import { makeHook } from "./__tests__/helpers.js";
 
@@ -81,6 +81,21 @@ describe("Hook", () => {
       const spy = vi.spyOn(hook, "afterUpdate");
       hook.updated();
       expect(spy).toHaveBeenCalled();
+    });
+  });
+
+  describe("el", () => {
+    it("is typed by the element type parameter", () => {
+      class TextareaHook extends Hook<HTMLTextAreaElement> {}
+      const el = document.createElement("textarea");
+      const { hook } = makeHook(TextareaHook, el);
+      expect(hook.el).toBe(el);
+      expectTypeOf(hook.el).toEqualTypeOf<HTMLTextAreaElement>();
+    });
+
+    it("defaults to HTMLElement", () => {
+      const { hook } = makeHook(Hook, document.createElement("div"));
+      expectTypeOf(hook.el).toEqualTypeOf<HTMLElement>();
     });
   });
 });
